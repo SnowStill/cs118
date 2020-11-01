@@ -14,20 +14,27 @@
 #include <pthread.h>
 #include <fstream>
 using namespace std;
-ofstream myfile;
 string path;
+string fullpath;
+int count = 0;
 void sig_handler(int sig)
 {
   exit(1);
 }
 void* socketThread(void* arg){
+  pthread_detach(pthread_self()); 
+  count++;
+  string a = to_string(count);
   int newSocket = *((int *)arg);
   char buf[1024] = {0};
-  myfile.open (path.c_str(), ios::app);
+  fullpath = path + "/" + a + ".file";
+  ofstream myfile;
+  myfile.open (fullpath.c_str(), ios::app);
   if(!myfile.is_open()){
     cerr <<"Error: the file couldnt be found." <<endl;
     exit(1);
 }
+  cout << fullpath;
   while (1) {
     memset(buf, '\0', sizeof(buf));
     int r = recv(newSocket, buf, 1024, 0) == -1;
@@ -40,7 +47,6 @@ void* socketThread(void* arg){
     myfile << buf;
   }
   myfile.close();
-  close(newSocket);
 }
 
 int main(int argc, char* argv[]){
@@ -83,9 +89,9 @@ int main(int argc, char* argv[]){
     cerr <<"Error: Failed to listen" << endl;
     return 1;
   }
-  pthread_t tid[10];
+  pthread_t tid;
   int i = 0;
-  while(i < 10){
+  while(1){
     //accpet
     struct sockaddr_in clientAddr;
     socklen_t clientAddrSize = sizeof(clientAddr);
@@ -95,15 +101,15 @@ int main(int argc, char* argv[]){
     cout << "Accept a connection from: " << ipstr << ":" <<
       ntohs(clientAddr.sin_port) << endl;
     //make thread
-    int result = pthread_create(&tid[i], NULL, socketThread,&clientSockfd);
-    if (result < 0)
+    int result = pthread_create(&tid, NULL, socketThread,&clientSockfd);
+    if (result < 0){
       cout << "Failed to create thread from: " << ipstr << ":" << ntohs(clientAddr.sin_port) << endl;
-    else
-    i++;
-  }
-  for(int i = 0; i < 10; i++)
-    {
-      pthread_join(tid[i], NULL);
+      exit(1);
     }
+  }
+  //for(int i = 0; i < 10; i++)
+  // {
+  //  pthread_join(tid[i], NULL);
+  // }
   return 0;
 }
