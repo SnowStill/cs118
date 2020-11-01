@@ -10,6 +10,7 @@
 #include <iostream>
 #include <sstream>
 #include <stdlib.h>
+#include <fstream>
 using namespace std;
 int main(int argc, char* argv[]){
   struct hostent *server;
@@ -45,5 +46,22 @@ int main(int argc, char* argv[]){
   }
 
   string path = string(argv[3]);
-  cout << path << endl;
+  bool isEnd = false;
+  char a;
+  string input;  
+  ifstream myfile (path.c_str());
+  if(myfile.is_open()){
+    while(!myfile.eof()){
+      myfile.get(a);
+      cout << a;
+      input += a;
+      }
+  }
+  myfile.close();
+  if (send(sockfd, input.c_str(), input.size(), 0) == -1) {
+    cerr <<"Error: Failed to send,";
+    return 1;
+  }
+  close(sockfd);
+  return 0;
 }  

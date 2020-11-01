@@ -12,30 +12,34 @@
 #include <typeinfo>
 #include <signal.h>
 #include <pthread.h>
-
+#include <fstream>
 using namespace std;
-
+ofstream myfile;
+string path;
 void sig_handler(int sig)
 {
   exit(1);
 }
-
 void* socketThread(void* arg){
   int newSocket = *((int *)arg);
-  char buf[20] = {0};
-  stringstream ss;
+  char buf[1024] = {0};
+  myfile.open (path.c_str(), ios::app);
+  if(!myfile.is_open()){
+    cerr <<"Error: the file couldnt be found." <<endl;
+    exit(1);
+}
   while (1) {
     memset(buf, '\0', sizeof(buf));
-    if (recv(newSocket, buf, 20, 0) == -1) {
+    int r = recv(newSocket, buf, 1024, 0) == -1;
+    if (r == -1) {
       cerr << "Error: Failed to recieve files." << endl;
       exit(1);
     }
-    ss << buf << endl;
-    cout << buf << endl;
-    if (ss.str() == "close\n")
+    if(buf == "")
       break;
-    ss.str("");
+    myfile << buf;
   }
+  myfile.close();
   close(newSocket);
 }
 
@@ -49,7 +53,7 @@ int main(int argc, char* argv[]){
     cerr << "Error: Invalid port number." << endl;
     return 1;
   }
-  string path = string(argv[2]);
+  path = string(argv[2]);
 
   signal(SIGINT, sig_handler);
   //create sock
@@ -69,11 +73,12 @@ int main(int argc, char* argv[]){
   addr.sin_port = htons(port);     // short, network byte order
   addr.sin_addr.s_addr = inet_addr("127.0.0.1");
   memset(addr.sin_zero, '\0', sizeof(addr.sin_zero));
-
+  //bind
   if (bind(sockfd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
     cerr << "Error: Failed to bind the socket and server." << endl;
     return 1;
   }
+  //listen
   if (listen(sockfd, 10) == -1) {
     cerr <<"Error: Failed to listen" << endl;
     return 1;
@@ -81,6 +86,7 @@ int main(int argc, char* argv[]){
   pthread_t tid[10];
   int i = 0;
   while(i < 10){
+    //accpet
     struct sockaddr_in clientAddr;
     socklen_t clientAddrSize = sizeof(clientAddr);
     int clientSockfd = accept(sockfd, (struct sockaddr*)&clientAddr, &clientAddrSize);
@@ -88,7 +94,7 @@ int main(int argc, char* argv[]){
     inet_ntop(clientAddr.sin_family, &clientAddr.sin_addr, ipstr, sizeof(ipstr));
     cout << "Accept a connection from: " << ipstr << ":" <<
       ntohs(clientAddr.sin_port) << endl;
-
+    //make thread
     int result = pthread_create(&tid[i], NULL, socketThread,&clientSockfd);
     if (result < 0)
       cout << "Failed to create thread from: " << ipstr << ":" << ntohs(clientAddr.sin_port) << endl;
