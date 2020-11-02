@@ -13,40 +13,58 @@
 #include <signal.h>
 #include <pthread.h>
 #include <fstream>
+#include "CRC.h"
+#include <poll.h>
 using namespace std;
 string path;
 string fullpath;
 int count = 0;
+
 void sig_handler(int sig)
 {
   exit(1);
 }
 void* socketThread(void* arg){
-  pthread_detach(pthread_self()); 
+  pthread_detach(pthread_self());
   count++;
   string a = to_string(count);
   int newSocket = *((int *)arg);
-  char buf[1024] = {0};
+  char* buf = new char[1024];
+  uint8_t* ubuf = new uint8_t[1024];
   fullpath = path + "/" + a + ".file";
   ofstream myfile;
   myfile.open (fullpath.c_str(), ios::app);
   if(!myfile.is_open()){
     cerr <<"Error: the file couldnt be found." <<endl;
     exit(1);
-}
-  cout << fullpath;
+  }
   while (1) {
-    memset(buf, '\0', sizeof(buf));
-    int r = recv(newSocket, buf, 1024, 0) == -1;
+    memset(buf,0,1024);
+    memset(ubuf,0,1024);
+    int r = recv(newSocket, buf, 1024, 0);
     if (r == -1) {
       cerr << "Error: Failed to recieve files." << endl;
       exit(1);
     }
-    if(buf == "")
+    if(r==0){
       break;
-    myfile << buf;
+    }
+    CRC crc;
+    uint64_t crc_code;
+    memcpy(ubuf, buf,strlen(buf));
+    crc_code = crc.get_crc_code(ubuf, 1024);
+    if(crc_code != 0x0000000000000000){
+      cerr << crc_code;
+      cerr << "Error: File is corrputed while trnasmitting." << endl;
+      //     exit(1);
+    }
+    char* new_buf = new char[1024];
+    strncpy(new_buf, buf,strlen(buf)-8);
+    myfile << new_buf;
   }
+
   myfile.close();
+  return 0;
 }
 
 int main(int argc, char* argv[]){
@@ -90,7 +108,6 @@ int main(int argc, char* argv[]){
     return 1;
   }
   pthread_t tid;
-  int i = 0;
   while(1){
     //accpet
     struct sockaddr_in clientAddr;
@@ -111,5 +128,6 @@ int main(int argc, char* argv[]){
   // {
   //  pthread_join(tid[i], NULL);
   // }
+  close(sockfd);
   return 0;
 }

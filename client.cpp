@@ -11,6 +11,9 @@
 #include <sstream>
 #include <stdlib.h>
 #include <fstream>
+#include "CRC.h"
+#include <poll.h>
+
 using namespace std;
 int main(int argc, char* argv[]){
   struct hostent *server;
@@ -44,24 +47,52 @@ int main(int argc, char* argv[]){
     cerr << "Error: Failed to connect to the server" << endl;
     return 1;
   }
+  struct pollfd p[1];
+  p[0].fd = sockfd;
+  p[0].events = POLLIN | POLLHUP | POLLERR;
+  int dc=0;
 
   string path = string(argv[3]);
-  bool isEnd = false;
-  char a;
-  string input;  
+  char* input = new char[1024];
+  uint8_t* input_crc = new uint8_t[1016];
   ifstream myfile (path.c_str());
-  if(myfile.is_open()){
-    while(!myfile.eof()){
-      myfile.get(a);
-      cout << a;
-      input += a;
+  while(1){
+    dc = poll(p,1,10000);
+    if(dc > 0){
+      myfile.read(input, 1016);
+      memcpy(input_crc, input, strlen(input));
+      CRC crc;
+      uint64_t crc_key = htobe64(crc.get_crc_code(input_crc, strlen(input)));
+      cout << strlen(input);
+      memcpy(input + strlen(input),&crc_key,8);
+      cout << strlen(input);
+      if (send(sockfd, input, strlen(input), 0) == -1) {
+	cerr <<"Error: Failed to send,";
+	return 1;
       }
+      //if(i == 1015){
+      /*CRC crc;
+	uint64_t crc_key = htobe64(crc.get_crc_code(input_crc, 1024));
+	memcpy(input + strlen(input),&crc_key,8);
+	//cout << input;
+	if (send(sockfd, input, strlen(input), 0) == -1) {
+	cerr <<"Error: Failed to send,";
+	return 1;
+	}*/
+      //}
+      if(myfile.eof()){
+	break;
+      }
+      memset(input,0,1024);
+      
+    }
+    else if (dc == 0){
+      close(sockfd);
+      cerr << "Error: Disconnected from server for ideing.";
+      exit(1);
+    }
   }
   myfile.close();
-  if (send(sockfd, input.c_str(), input.size(), 0) == -1) {
-    cerr <<"Error: Failed to send,";
-    return 1;
-  }
   close(sockfd);
   return 0;
 }  
