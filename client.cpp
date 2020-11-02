@@ -49,9 +49,8 @@ int main(int argc, char* argv[]){
   }
   struct pollfd p[1];
   p[0].fd = sockfd;
-  p[0].events = POLLIN | POLLHUP | POLLERR;
+  p[0].events = POLLOUT | POLLHUP | POLLERR;
   int dc=0;
-
   string path = string(argv[3]);
   char* input = new char[1024];
   uint8_t* input_crc = new uint8_t[1016];
@@ -59,36 +58,25 @@ int main(int argc, char* argv[]){
   while(1){
     dc = poll(p,1,10000);
     if(dc > 0){
-      myfile.read(input, 1016);
-      memcpy(input_crc, input, strlen(input));
-      CRC crc;
-      uint64_t crc_key = htobe64(crc.get_crc_code(input_crc, strlen(input)));
-      cout << strlen(input);
-      memcpy(input + strlen(input),&crc_key,8);
-      cout << strlen(input);
-      if (send(sockfd, input, strlen(input), 0) == -1) {
-	cerr <<"Error: Failed to send,";
-	return 1;
-      }
-      //if(i == 1015){
-      /*CRC crc;
-	uint64_t crc_key = htobe64(crc.get_crc_code(input_crc, 1024));
+      if(p[0].revents & POLLOUT){
+	myfile.read(input, 1016);
+	memcpy(input_crc, input, strlen(input));
+	CRC crc;
+	uint64_t crc_key = htobe64(crc.get_crc_code(input_crc, strlen(input)));
 	memcpy(input + strlen(input),&crc_key,8);
-	//cout << input;
 	if (send(sockfd, input, strlen(input), 0) == -1) {
-	cerr <<"Error: Failed to send,";
-	return 1;
-	}*/
-      //}
-      if(myfile.eof()){
-	break;
+	  cerr <<"Error: Failed to send,";
+	  return 1;
+	}
+	if(myfile.eof()){
+	  break;
+	}
+	memset(input,0,1024);
       }
-      memset(input,0,1024);
-      
     }
     else if (dc == 0){
       close(sockfd);
-      cerr << "Error: Disconnected from server for ideing.";
+      cerr << "Error: Disconnected from server for ideling.";
       exit(1);
     }
   }

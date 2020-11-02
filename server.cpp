@@ -15,6 +15,8 @@
 #include <fstream>
 #include "CRC.h"
 #include <poll.h>
+#include <chrono>
+
 using namespace std;
 string path;
 string fullpath;
@@ -33,21 +35,42 @@ void* socketThread(void* arg){
   uint8_t* ubuf = new uint8_t[1024];
   fullpath = path + "/" + a + ".file";
   ofstream myfile;
+  int s = 0;
+  int first_dced=0;
+  chrono::steady_clock sc;
+  auto start = sc.now();
   myfile.open (fullpath.c_str(), ios::app);
   if(!myfile.is_open()){
     cerr <<"Error: the file couldnt be found." <<endl;
     exit(1);
   }
   while (1) {
-    memset(buf,0,1024);
-    memset(ubuf,0,1024);
+    //memset(buf,0,1024);
+    //memset(ubuf,0,1024);
     int r = recv(newSocket, buf, 1024, 0);
+    if(r==0){
+      break;
+    }
+    if(r==0){
+      if (first_dced == 0){
+	  start = sc.now();
+	  first_dced = 1;
+	}
+      else{
+	auto end = sc.now();
+	auto time_span = static_cast<chrono::duration<double>>(end - start);   // measure time span between start & end
+	s = s + time_span.count();
+	if(s>= 10){
+	  myfile << "Error: No mesasge has been recieved for 10s." << endl;
+	  first_dced = 0;
+	  s = 0;
+	  break;
+	}
+      }
+      }
     if (r == -1) {
       cerr << "Error: Failed to recieve files." << endl;
       exit(1);
-    }
-    if(r==0){
-      break;
     }
     CRC crc;
     uint64_t crc_code;
@@ -61,8 +84,10 @@ void* socketThread(void* arg){
     char* new_buf = new char[1024];
     strncpy(new_buf, buf,strlen(buf)-8);
     myfile << new_buf;
+    memset(new_buf,0,1024);
+    memset(buf,0,1024);
+    memset(ubuf,0,1024);
   }
-
   myfile.close();
   return 0;
 }
