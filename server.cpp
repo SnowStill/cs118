@@ -79,7 +79,7 @@ void* socketThread(void* arg){
     if(crc_code != 0x0000000000000000){
       cerr << crc_code;
       cerr << "Error: File is corrputed while trnasmitting." << endl;
-      //     exit(1);
+      exit(1);
     }
     char* new_buf = new char[1024];
     strncpy(new_buf, buf,strlen(buf)-8);

@@ -72,6 +72,8 @@ int main(int argc, char* argv[]){
 	  break;
 	}
 	memset(input,0,1024);
+	memset(input_crc,0,1024);
+
       }
     }
     else if (dc == 0){
